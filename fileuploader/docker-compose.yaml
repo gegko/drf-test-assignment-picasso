@@ -1,0 +1,55 @@
+services:
+  db:
+    image: postgres
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+    ports:
+      - 7654:5432
+    environment:
+      - POSTGRES_DB=fileuploader
+      - POSTGRES_USER=postgresuser
+      - POSTGRES_PASSWORD=postgrespass
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - 6379:6379
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+    ports:
+      - 8080:8080
+    depends_on:
+      db:
+        condition: service_healthy
+    command: /bin/bash -c "chmod +x run.bash && ./run.bash"
+
+  celery:
+    build:
+      context: .
+      dockerfile: Dockerfile.celery
+    depends_on:
+      - db
+      - redis
+      - web
+    # command: celery --app=fileuploader worker --loglevel=info
+
+  # dashboard:
+  #   build: .
+  #   command: celery flower --app=fileuploader --port=5555 --broker=redis://redis:6379/0
+  #   ports:
+  #     - 5555:5555
+  #   depends_on:
+  #     - web
+  #     - redis
+  #     - celery
+
